@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Secrets - never commit
+.env
+.env.local
+*.pem
+*.key
+
+# Corpus: licensed content, fetched at setup time, never redistributed.
+# See docs/architecture.md "Corpus licensing".
+data/corpus/
+data/*.sqlite
+data/*.db
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Local artifacts / logs
+logs/
+*.log
+.DS_Store
+
+# TypeScript incremental build artifact
+frontend/tsconfig.tsbuildinfo
