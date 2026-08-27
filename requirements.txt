@@ -1,0 +1,26 @@
+# --- API ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+pydantic>=2.10,<3.0
+pydantic-settings>=2.7,<3.0
+
+# --- Persistence ---
+sqlalchemy[asyncio]>=2.0.36,<2.1
+asyncpg>=0.30,<0.31
+greenlet>=3.1
+
+# --- Model providers ---
+httpx>=0.28
+# Cloud agent layer. Imported lazily, so the local-only Ollama demo still runs
+# if this fails to install on an unusual platform.
+claude-agent-sdk>=0.2,<0.3
+
+# --- Retrieval ---
+pgvector>=0.3,<0.6
+# BM25 is implemented in-repo (app/rag/lexical.py) - no heavyweight dependency.
+
+# --- Observability ---
+structlog>=24.4
+
+# --- Content processing ---
+pyyaml>=6.0
