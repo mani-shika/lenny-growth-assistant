@@ -1,0 +1,88 @@
+# One-command startup:  docker compose up --build
+#
+# Brings up Postgres (with pgvector), the API + built SPA, and runs corpus
+# ingestion once before the API starts serving. Ollama is expected to run on the
+# HOST, not in a container - it is the user's local model runtime and often has
+# GPU access that a container would not.
+
+name: lenny-growth-assistant
+
+services:
+  db:
+    # pgvector's own image: stock Postgres 16 plus the vector extension, so the
+    # app never has to compile it at runtime.
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: lenny
+      POSTGRES_PASSWORD: lenny
+      POSTGRES_DB: lenny
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Exposed so an evaluator can psql in and inspect the schema directly.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lenny -d lenny"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # Runs to completion, then exits. `api` waits for it, so the first request an
+  # evaluator makes hits a populated index rather than an empty one.
+  ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "scripts/ingest.py"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lenny:lenny@db:5432/lenny
+      # Deliberately NOT ${OLLAMA_BASE_URL}: Compose interpolates that from
+      # .env, where host-based development sets localhost, which no container
+      # can reach. Override with OLLAMA_HOST_URL if Ollama runs elsewhere.
+      OLLAMA_BASE_URL: ${OLLAMA_HOST_URL:-http://host.docker.internal:11434}
+      CORPUS_DIR: /srv/data/corpus
+    volumes:
+      - corpus:/srv/data
+    depends_on:
+      db:
+        condition: service_healthy
+    extra_hosts:
+      # Lets the container reach Ollama running on the host, on Linux too.
+      - "host.docker.internal:host-gateway"
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lenny:lenny@db:5432/lenny
+      # Deliberately NOT ${OLLAMA_BASE_URL}: Compose interpolates that from
+      # .env, where host-based development sets localhost, which no container
+      # can reach. Override with OLLAMA_HOST_URL if Ollama runs elsewhere.
+      OLLAMA_BASE_URL: ${OLLAMA_HOST_URL:-http://host.docker.internal:11434}
+      CORPUS_DIR: /srv/data/corpus
+    ports:
+      - "8000:8000"
+    volumes:
+      - corpus:/srv/data
+    depends_on:
+      db:
+        condition: service_healthy
+      ingest:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  # Holds the cloned corpus so a rebuild does not re-download it. Not committed
+  # to the repository - see the licence note in docs/architecture.md.
+  corpus:
